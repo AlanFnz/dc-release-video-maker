@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('api', {
+  readAsDataUrl: (filePath: string) =>
+    ipcRenderer.invoke('fs:readAsDataUrl', filePath),
+
   openFile: (filters: Electron.FileFilter[]) =>
     ipcRenderer.invoke('dialog:openFile', filters),
 

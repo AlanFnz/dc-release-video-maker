@@ -18,6 +18,7 @@ interface FileFilter { name: string; extensions: string[] }
 declare global {
   interface Window {
     api: {
+      readAsDataUrl: (filePath: string) => Promise<string>
       openFile: (filters: FileFilter[]) => Promise<string | null>
       saveFile: (defaultName: string) => Promise<string | null>
       exportVideo: (

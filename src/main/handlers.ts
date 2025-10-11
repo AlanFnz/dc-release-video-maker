@@ -1,6 +1,6 @@
 import { ipcMain, dialog, app } from 'electron'
-import { join, dirname } from 'path'
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs'
+import { join, dirname, extname } from 'path'
+import { writeFileSync, unlinkSync, existsSync, mkdirSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import ffmpegStatic from 'ffmpeg-static'
 import Ffmpeg from 'fluent-ffmpeg'
@@ -8,6 +8,18 @@ import Ffmpeg from 'fluent-ffmpeg'
 if (ffmpegStatic) Ffmpeg.setFfmpegPath(ffmpegStatic)
 
 export function registerHandlers(): void {
+  // read a user file and return it as a base64 data url (avoids file:// csp issues)
+  ipcMain.handle('fs:readAsDataUrl', (_e, filePath: string) => {
+    const buf = readFileSync(filePath)
+    const ext = extname(filePath).slice(1).toLowerCase()
+    const mime =
+      ext === 'png' ? 'image/png' :
+      ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+      ext === 'webp' ? 'image/webp' :
+      'application/octet-stream'
+    return `data:${mime};base64,${buf.toString('base64')}`
+  })
+
   // open a file picker and return the chosen path
   ipcMain.handle('dialog:openFile', async (_e, filters: Electron.FileFilter[]) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openFile'], filters })

@@ -15,11 +15,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-// load an image from a file:// path chosen by the user
-export function loadImageFromPath(filePath: string): Promise<HTMLImageElement> {
-  // electron exposes file paths, prepend file:// if needed
-  const url = filePath.startsWith('file://') ? filePath : `file://${filePath}`
-  return loadImage(url)
+// load an image from an absolute path chosen by the user
+// reads via main process to avoid file:// csp restrictions
+export async function loadImageFromPath(filePath: string): Promise<HTMLImageElement> {
+  const dataUrl = await window.api.readAsDataUrl(filePath)
+  return loadImage(dataUrl)
 }
 
 // load all static assets bundled with the app
