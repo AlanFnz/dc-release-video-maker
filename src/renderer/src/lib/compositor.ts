@@ -1,5 +1,5 @@
 import type { CompositionConfig } from './config'
-import { drawGlitchText, type GlitchState } from './glitch'
+import { drawGlitchText, drawDecoderGlitchText, type GlitchState } from './glitch'
 
 export interface FrameInput {
   t: number             // current time in seconds
@@ -47,7 +47,10 @@ export function drawFrame(
   drawVinyl(ctx, assets, config, t, width, height)
 
   // 4. text overlays
-  drawText(ctx, frame, release, config, width, height, glitchIntensity)
+  drawText(ctx, frame, release, config, width, height, glitchIntensity, t)
+
+  // 5. canvas-wide noise — constant low level, boosted during glitches
+  drawNoise(ctx, width, height, glitchIntensity)
 }
 
 function drawTextures(
@@ -129,10 +132,13 @@ function drawText(
   config: CompositionConfig,
   w: number,
   h: number,
-  intensity: number
+  intensity: number,
+  t: number
 ): void {
   const { font, layout, glitch } = config
   const px = (size: number) => `${Math.round(size * (w / 1500))}px`
+  const isRevealing = t < glitch.revealDuration
+  const decoderProgress = isRevealing ? t / glitch.revealDuration : 1
 
   const entries: Array<{
     text: string
@@ -147,17 +153,63 @@ function drawText(
   ]
 
   for (const entry of entries) {
-    drawGlitchText(ctx, {
-      text: entry.text,
-      x: entry.pos.x * w,
-      y: entry.pos.y * h,
-      font: `${px(entry.size)} '${font.family}', sans-serif`,
-      color: font.color,
-      align: entry.pos.align,
-      intensity: entry.useGlitch ? intensity : 0,
-      rgbOffset: glitch.rgbOffset * (w / 1500),
-      glowBlur: glitch.glowBlur * (w / 1500),
-      glowOpacity: glitch.glowOpacity,
-    })
+    const fontStr = `${px(entry.size)} '${font.family}', sans-serif`
+    const ex = entry.pos.x * w
+    const ey = entry.pos.y * h
+
+    if (entry.useGlitch && isRevealing) {
+      drawDecoderGlitchText(
+        ctx,
+        { text: entry.text, x: ex, y: ey, font: fontStr, color: font.color, align: entry.pos.align, progress: decoderProgress },
+        { rgbOffset: glitch.rgbOffset * (w / 1500), glowBlur: glitch.glowBlur * (w / 1500), glowOpacity: glitch.glowOpacity }
+      )
+    } else {
+      drawGlitchText(ctx, {
+        text: entry.text,
+        x: ex,
+        y: ey,
+        font: fontStr,
+        color: font.color,
+        align: entry.pos.align,
+        intensity: entry.useGlitch ? intensity : 0,
+        rgbOffset: glitch.rgbOffset * (w / 1500),
+        glowBlur: glitch.glowBlur * (w / 1500),
+        glowOpacity: glitch.glowOpacity,
+      })
+    }
   }
+}
+
+// full-canvas noise grain — uses a tiled ImageData approach for performance
+function drawNoise(ctx: CanvasRenderingContext2D, w: number, h: number, glitchIntensity: number): void {
+  const tileSize = 256
+  const off = document.createElement('canvas')
+  off.width = tileSize
+  off.height = tileSize
+  const offCtx = off.getContext('2d')!
+  const imageData = offCtx.createImageData(tileSize, tileSize)
+  const data = imageData.data
+
+  // base alpha visible always; extra alpha added during glitch hits
+  const baseAlpha = 14
+  const extraAlpha = Math.round(glitchIntensity * 52)
+  const totalAlpha = baseAlpha + extraAlpha
+
+  // ~10% pixel density — sparse enough to read as grain, not fog
+  for (let i = 0; i < data.length; i += 4) {
+    if (Math.random() > 0.10) continue
+    const v = Math.floor(Math.random() * 255)
+    data[i] = data[i + 1] = data[i + 2] = v
+    data[i + 3] = Math.round(totalAlpha * (0.5 + Math.random() * 0.5))
+  }
+
+  offCtx.putImageData(imageData, 0, 0)
+
+  ctx.save()
+  for (let ty = 0; ty < h; ty += tileSize) {
+    for (let tx = 0; tx < w; tx += tileSize) {
+      ctx.drawImage(off, tx, ty)
+    }
+  }
+  ctx.restore()
 }
