@@ -10,6 +10,8 @@ export interface CompositionConfig {
   labelName: string
   // default video duration in seconds
   duration: number
+  // background image scale (1.0 = cover-fit, >1 = zoom in)
+  backgroundScale: number
   fps: number
   size: { width: number; height: number }
   vinyl: {
@@ -22,6 +24,8 @@ export interface CompositionConfig {
     cy: number
     // center label image radius as fraction of vinyl radius
     labelRadiusFraction: number
+    // label image scale within the label circle (1.0 = cover-fit, >1 = zoom in)
+    labelImageScale: number
   }
   glitch: {
     // how long the initial reveal lasts (seconds)
@@ -57,6 +61,7 @@ export interface CompositionConfig {
 export const defaultConfig: CompositionConfig = {
   labelName: 'DUB CULTURE',
   duration: 60,
+  backgroundScale: 1.0,
   fps: 30,
   size: { width: 1500, height: 1500 },
   vinyl: {
@@ -65,6 +70,7 @@ export const defaultConfig: CompositionConfig = {
     cx: 0.5,
     cy: 0.5,
     labelRadiusFraction: 1,
+    labelImageScale: 1.0,
   },
   glitch: {
     revealDuration: 1.2,
@@ -77,7 +83,7 @@ export const defaultConfig: CompositionConfig = {
   layout: {
     labelName:   { x: 0.045, y: 0.072, align: 'left' },
     releaseName: { x: 0.955, y: 0.072, align: 'right' },
-    artistName:  { x: 0.5,   y: 0.925, align: 'center' },
+    artistName:  { x: 0.5,   y: 0.944, align: 'center' },
     trackName:   { x: 0.5,   y: 0.962, align: 'center' },
   },
   textures: [

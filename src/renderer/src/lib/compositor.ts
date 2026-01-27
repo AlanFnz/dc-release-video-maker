@@ -34,7 +34,12 @@ export function drawFrame(
 
   // 1. background
   if (assets.background) {
-    ctx.drawImage(assets.background, 0, 0, width, height)
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, 0, width, height)
+    ctx.clip()
+    drawImageCover(ctx, assets.background, 0, 0, width, height, config.backgroundScale)
+    ctx.restore()
   } else {
     ctx.fillStyle = '#1a1a1a'
     ctx.fillRect(0, 0, width, height)
@@ -51,6 +56,33 @@ export function drawFrame(
 
   // 5. canvas-wide noise — constant low level, boosted during glitches
   drawNoise(ctx, width, height, glitchIntensity)
+}
+
+// draws an image cover-fitted (no distortion) into dest rect, with optional zoom scale
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  destX: number,
+  destY: number,
+  destW: number,
+  destH: number,
+  scale: number
+): void {
+  const imgAspect = img.width / img.height
+  const destAspect = destW / destH
+  let drawW: number, drawH: number
+  if (imgAspect > destAspect) {
+    // image is wider — fit by height
+    drawH = destH * scale
+    drawW = drawH * imgAspect
+  } else {
+    // image is taller — fit by width
+    drawW = destW * scale
+    drawH = drawW / imgAspect
+  }
+  const offsetX = destX + (destW - drawW) / 2
+  const offsetY = destY + (destH - drawH) / 2
+  ctx.drawImage(img, offsetX, offsetY, drawW, drawH)
 }
 
 function drawTextures(
@@ -118,7 +150,7 @@ function drawVinyl(
     ctx.beginPath()
     ctx.arc(0, 0, lr, 0, Math.PI * 2)
     ctx.clip()
-    ctx.drawImage(assets.vinylLabel, -lr, -lr, lr * 2, lr * 2)
+    drawImageCover(ctx, assets.vinylLabel, -lr, -lr, lr * 2, lr * 2, config.vinyl.labelImageScale)
     ctx.restore()
   }
 
@@ -147,9 +179,13 @@ function drawText(
     useGlitch: boolean
   }> = [
     { text: config.labelName,      pos: layout.labelName,   size: font.labelSize,   useGlitch: false },
-    { text: release.releaseName,   pos: layout.releaseName, size: font.releaseSize, useGlitch: false },
-    { text: release.artistName,    pos: layout.artistName,  size: font.artistSize,  useGlitch: true },
-    { text: release.trackName,     pos: layout.trackName,   size: font.trackSize,   useGlitch: true },
+    { text: release.releaseName.toUpperCase(),   pos: layout.releaseName, size: font.releaseSize, useGlitch: false },
+    {
+      text: `${release.artistName} - ${release.trackName}`.toUpperCase(),
+      pos: layout.artistName,
+      size: font.artistSize,
+      useGlitch: true,
+    },
   ]
 
   for (const entry of entries) {

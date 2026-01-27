@@ -3,6 +3,8 @@ import texture1Url from '../assets/textures/texture1.png'
 import texture2Url from '../assets/textures/texture2.png'
 import texture3Url from '../assets/textures/texture3.png'
 import vinylDiscUrl from '../assets/vinyl-disc.png'
+import backgroundExampleUrl from '../assets/background-example.png'
+import vinylLabelExampleUrl from '../assets/vinyl-lable-example.png'
 
 import type { Assets } from './compositor'
 
@@ -23,15 +25,19 @@ export async function loadImageFromPath(filePath: string): Promise<HTMLImageElem
 }
 
 // load all static assets bundled with the app
-export async function loadStaticAssets(): Promise<Omit<Assets, 'background' | 'vinylLabel'>> {
-  const [t1, t2, t3, disc] = await Promise.all([
+export async function loadStaticAssets(): Promise<Assets> {
+  const [t1, t2, t3, disc, bg, label] = await Promise.all([
     loadImage(texture1Url),
     loadImage(texture2Url),
     loadImage(texture3Url),
     loadImage(vinylDiscUrl),
+    loadImage(backgroundExampleUrl),
+    loadImage(vinylLabelExampleUrl),
   ])
   return {
     vinylDisc: disc,
     textures: [t1, t2, t3],
+    background: bg,
+    vinylLabel: label,
   }
 }
