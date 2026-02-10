@@ -8,20 +8,60 @@ interface PreviewCanvasProps {
   config: CompositionConfig
   assets: Assets
   release: ReleaseData
+  audioSrc?: string | null
+  audioStartTime?: number
 }
 
-export function PreviewCanvas({ config, assets, release }: PreviewCanvasProps) {
+export function PreviewCanvas({ config, assets, release, audioSrc, audioStartTime = 0 }: PreviewCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
   const lastTsRef = useRef<number | null>(null)
   const glitchRef = useRef(makeGlitchState(config))
   const playingRef = useRef(true)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const [playing, setPlaying] = useState(true)
   const [progress, setProgress] = useState(0)
 
   const duration = config.duration
+
+  // create/destroy audio element when src changes; seek + play once ready
+  useEffect(() => {
+    if (!audioSrc) {
+      audioRef.current?.pause()
+      audioRef.current = null
+      return
+    }
+    const audio = new Audio()
+    audioRef.current = audio
+    audio.src = audioSrc
+
+    const onReady = () => {
+      audio.currentTime = audioStartTime + elapsedRef.current
+      if (playingRef.current) {
+        audio.play().catch((e) => console.error('[audio] play failed:', e))
+      }
+    }
+    audio.addEventListener('canplay', onReady, { once: true })
+
+    return () => {
+      audio.removeEventListener('canplay', onReady)
+      audio.pause()
+      audio.src = ''
+      audioRef.current = null
+    }
+  // intentionally omit audioStartTime — seek happens inside onReady via closure value at creation time
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioSrc])
+
+  // seek audio when audioStartTime changes (without recreating the element)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !audioSrc) return
+    audio.currentTime = audioStartTime + elapsedRef.current
+    if (playingRef.current) audio.play().catch((e) => console.error('[audio] play failed:', e))
+  }, [audioStartTime]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // reset glitch state when config changes
   useEffect(() => {
@@ -40,10 +80,15 @@ export function PreviewCanvas({ config, assets, release }: PreviewCanvasProps) {
         }
         lastTsRef.current = now
 
-        // loop at duration
+        // loop at duration — restart audio too
         if (elapsedRef.current >= duration) {
           elapsedRef.current = elapsedRef.current % duration
           glitchRef.current = makeGlitchState(config)
+          const audio = audioRef.current
+          if (audio) {
+            audio.currentTime = audioStartTime
+            audio.play().catch((e) => console.error('[audio] play failed:', e))
+          }
         }
       } else {
         lastTsRef.current = null
@@ -65,12 +110,21 @@ export function PreviewCanvas({ config, assets, release }: PreviewCanvasProps) {
       rafRef.current = null
       lastTsRef.current = null
     }
-  }, [config, assets, release, duration])
+  }, [config, assets, release, duration, audioSrc, audioStartTime])
 
   const togglePlay = useCallback(() => {
-    playingRef.current = !playingRef.current
-    setPlaying(playingRef.current)
-  }, [])
+    const nowPlaying = !playingRef.current
+    playingRef.current = nowPlaying
+    setPlaying(nowPlaying)
+    const audio = audioRef.current
+    if (!audio) return
+    if (nowPlaying) {
+      audio.currentTime = audioStartTime + elapsedRef.current
+      audio.play().catch((e) => console.error('[audio] play failed:', e))
+    } else {
+      audio.pause()
+    }
+  }, [audioSrc, audioStartTime])
 
   function handleSeek(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -78,6 +132,11 @@ export function PreviewCanvas({ config, assets, release }: PreviewCanvasProps) {
     elapsedRef.current = fraction * duration
     glitchRef.current = makeGlitchState(config)
     setProgress(fraction)
+    const audio = audioRef.current
+    if (audio) {
+      audio.currentTime = audioStartTime + fraction * duration
+      if (playingRef.current) audio.play().catch((e) => console.error('[audio] play failed:', e))
+    }
   }
 
   const fmt = (s: number) => {
