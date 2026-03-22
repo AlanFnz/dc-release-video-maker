@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { defaultConfig } from './lib/config'
 import { loadStaticAssets, loadImageFromPath } from './lib/assets'
 import { useExport } from './lib/useExport'
+import { generateAppIcon } from './lib/generate-icon'
+import { useI18n } from './i18n'
 import type { Assets } from './lib/compositor'
 import { PreviewCanvas } from './components/preview-canvas'
 import { FileField, type FileFilter } from './components/file-field'
@@ -15,8 +17,14 @@ const AUDIO_FILTERS: FileFilter[] = [
   { name: 'Audio', extensions: ['mp3', 'wav', 'aac', 'm4a', 'flac'] },
 ]
 
+function fmtTime(s: number): string {
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${String(sec).padStart(2, '0')}`
+}
 
 export default function App() {
+  const { t, lang, setLang, languages } = useI18n()
   const baseConfig = defaultConfig
 
   // form state
@@ -26,47 +34,92 @@ export default function App() {
   const [backgroundPath, setBackgroundPath] = useState<string | null>(null)
   const [vinylLabelPath, setVinylLabelPath] = useState<string | null>(null)
   const [audioPath, setAudioPath] = useState<string | null>(null)
+  const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null)
+  const [audioDuration, setAudioDuration] = useState<number | null>(null)
+  const [audioStartTime, setAudioStartTime] = useState(0)
   const [duration, setDuration] = useState(baseConfig.duration)
-  const config = useMemo(() => ({ ...baseConfig, duration }), [duration])
+  const [bottomFontSize, setBottomFontSize] = useState(baseConfig.font.artistSize)
+  const [vinylRadius, setVinylRadius] = useState(baseConfig.vinyl.radiusFraction)
+  const [labelRadius, setLabelRadius] = useState(baseConfig.vinyl.labelRadiusFraction)
+  const [backgroundScale, setBackgroundScale] = useState(baseConfig.backgroundScale)
+  const [labelImageScale, setLabelImageScale] = useState(baseConfig.vinyl.labelImageScale)
+  const config = useMemo(() => ({
+    ...baseConfig,
+    duration,
+    backgroundScale,
+    font: { ...baseConfig.font, artistSize: bottomFontSize },
+    vinyl: { ...baseConfig.vinyl, radiusFraction: vinylRadius, labelRadiusFraction: labelRadius, labelImageScale },
+  }), [duration, bottomFontSize, vinylRadius, labelRadius, backgroundScale, labelImageScale])
 
   // loaded assets
-  const [staticAssets, setStaticAssets] = useState<Omit<Assets, 'background' | 'vinylLabel'> | null>(null)
+  const [staticAssets, setStaticAssets] = useState<Assets | null>(null)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [labelImage, setLabelImage] = useState<HTMLImageElement | null>(null)
 
-  // load static assets once
+  // load static assets once (includes example placeholders)
   useEffect(() => {
     loadStaticAssets()
       .then(setStaticAssets)
       .catch((e) => console.error('failed to load static assets', e))
   }, [])
 
-  // load background when path changes
+  // generate and set app icon after fonts load
+  useEffect(() => {
+    generateAppIcon()
+      .then((buf) => window.api.setAppIcon(buf))
+      .catch((e) => console.warn('icon generation failed:', e))
+  }, [])
+
+  // load background when path changes, fall back to example
   useEffect(() => {
     if (!backgroundPath) { setBgImage(null); return }
     loadImageFromPath(backgroundPath).then(setBgImage).catch(() => setBgImage(null))
   }, [backgroundPath])
 
-  // load vinyl label when path changes
+  // load vinyl label when path changes, fall back to example
   useEffect(() => {
     if (!vinylLabelPath) { setLabelImage(null); return }
     loadImageFromPath(vinylLabelPath).then(setLabelImage).catch(() => setLabelImage(null))
   }, [vinylLabelPath])
 
+  // probe duration + create blob URL when audio path changes
+  useEffect(() => {
+    if (!audioPath) { setAudioDuration(null); setAudioBlobUrl(null); return }
+    Promise.all([
+      window.api.getAudioDuration(audioPath),
+      window.api.readAudioBuffer(audioPath),
+    ]).then(([d, { buffer, mimeType }]) => {
+      setAudioDuration(d)
+      setAudioStartTime(0)
+      setDuration((prev) => Math.min(prev, Math.floor(d)))
+      const blob = new Blob([buffer], { type: mimeType })
+      setAudioBlobUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob) })
+    }).catch(() => { setAudioDuration(null); setAudioBlobUrl(null) })
+  }, [audioPath])
+
   const assets: Assets = useMemo(() => ({
-    background: bgImage,
+    background: bgImage ?? staticAssets?.background ?? null,
     vinylDisc: staticAssets?.vinylDisc ?? null,
-    vinylLabel: labelImage,
+    vinylLabel: labelImage ?? staticAssets?.vinylLabel ?? null,
     textures: staticAssets?.textures ?? [],
   }), [bgImage, labelImage, staticAssets])
 
   const release = useMemo(() => ({
     artistName: artistName || 'Artist Name',
     trackName: trackName || 'Track Name',
-    releaseName: releaseName || 'Release Name',
+    releaseName: releaseName || 'DUBC000',
   }), [artistName, trackName, releaseName])
 
   const { state: exportState, startExport, reset } = useExport(config, assets)
+
+  const sidebarRef = useRef<HTMLElement>(null)
+  const [atBottom, setAtBottom] = useState(false)
+  const checkBottom = useCallback(() => {
+    const el = sidebarRef.current
+    if (!el) return
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 4)
+  }, [])
+  useEffect(() => { checkBottom() }, [checkBottom])
 
   const canExport = Boolean(
     artistName && trackName && releaseName && backgroundPath && vinylLabelPath && audioPath
@@ -74,85 +127,201 @@ export default function App() {
 
   function handleExport() {
     if (!audioPath) return
-    startExport(release, audioPath, config.duration)
+    startExport(release, audioPath, config.duration, audioStartTime)
   }
+
+  // derived slider max values
+  const maxStartTime = audioDuration !== null ? Math.max(0, Math.floor(audioDuration) - 1) : 0
+  const maxDuration = audioDuration !== null ? Math.floor(audioDuration - audioStartTime) : 600
 
   return (
     <div className="flex h-screen w-screen overflow-hidden" style={{ paddingTop: '28px' }}>
       {/* left panel — form */}
-      <aside className="w-72 shrink-0 flex flex-col gap-5 overflow-y-auto border-r border-neutral-800 p-5">
-        <h1 className="text-sm font-medium tracking-widest uppercase text-neutral-400">
-          Vinyl Video Gen
-        </h1>
+      <div className="relative w-72 shrink-0 border-r border-neutral-800">
+        {!atBottom && (
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-neutral-950 to-transparent z-10" />
+        )}
+        <aside ref={sidebarRef} onScroll={checkBottom} className="h-full flex flex-col gap-5 overflow-y-scroll p-5 [scrollbar-width:thin] [scrollbar-color:#404040_transparent]">
 
-        <section className="flex flex-col gap-3">
-          <p className="text-xs uppercase tracking-widest text-neutral-600">images</p>
-          <FileField
-            label="Background"
-            accept={IMAGE_FILTERS}
-            value={backgroundPath}
-            onChange={setBackgroundPath}
-            placeholder="upload background image"
-          />
-          <FileField
-            label="Vinyl Label"
-            accept={IMAGE_FILTERS}
-            value={vinylLabelPath}
-            onChange={setVinylLabelPath}
-            placeholder="upload vinyl center image"
-          />
-        </section>
+          {/* header + language selector */}
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-xs font-medium tracking-widest uppercase text-neutral-400 leading-tight">
+              {t('app.title')}
+            </h1>
+            <div className="flex gap-1 shrink-0">
+              {(Object.keys(languages) as (keyof typeof languages)[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  title={languages[l].label}
+                  className={`text-base leading-none transition-opacity ${lang === l ? 'opacity-100' : 'opacity-30 hover:opacity-60'}`}
+                >
+                  {languages[l].flag}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <section className="flex flex-col gap-3">
-          <p className="text-xs uppercase tracking-widest text-neutral-600">text</p>
-          <TextField label="Artist" value={artistName} onChange={setArtistName} placeholder="Artist Name" />
-          <TextField label="Track" value={trackName} onChange={setTrackName} placeholder="Track Name" />
-          <TextField label="Release" value={releaseName} onChange={setReleaseName} placeholder="Release Name" />
-        </section>
+          {/* images */}
+          <section className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.images')}</p>
+            <FileField
+              label={t('field.background')}
+              accept={IMAGE_FILTERS}
+              value={backgroundPath}
+              onChange={setBackgroundPath}
+              placeholder={t('placeholder.chooseImage')}
+              hint={t('hint.recommended')}
+              previewSrc={bgImage?.src ?? null}
+              previewShape="square"
+            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.backgroundScale')}</label>
+                <span className="text-xs text-neutral-600">{backgroundScale.toFixed(2)}</span>
+              </div>
+              <input
+                type="range" min={0.5} max={3.0} step={0.05}
+                value={backgroundScale}
+                onChange={(e) => setBackgroundScale(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+            <FileField
+              label={t('field.vinylLabel')}
+              accept={IMAGE_FILTERS}
+              value={vinylLabelPath}
+              onChange={setVinylLabelPath}
+              placeholder={t('placeholder.chooseImage')}
+              hint={t('hint.recommended')}
+              previewSrc={labelImage?.src ?? null}
+              previewShape="circle"
+            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.labelImageScale')}</label>
+                <span className="text-xs text-neutral-600">{labelImageScale.toFixed(2)}</span>
+              </div>
+              <input
+                type="range" min={0.5} max={3.0} step={0.05}
+                value={labelImageScale}
+                onChange={(e) => setLabelImageScale(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+          </section>
 
-        <section className="flex flex-col gap-3">
-          <p className="text-xs uppercase tracking-widest text-neutral-600">audio</p>
-          <FileField
-            label="Soundtrack"
-            accept={AUDIO_FILTERS}
-            value={audioPath}
-            onChange={setAudioPath}
-            placeholder="upload audio file"
-          />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-widest text-neutral-500">
-              Duration (seconds)
-            </label>
-            <input
-              type="number"
-              min={5}
-              max={600}
-              value={duration}
-              onChange={(e) => {
-                const v = Number(e.target.value)
-                if (v >= 1) setDuration(v)
-              }}
-              className="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-500 transition-colors"
+          {/* text */}
+          <section className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.text')}</p>
+            <TextField label={t('field.artist')} value={artistName} onChange={setArtistName} placeholder={t('placeholder.artistName')} />
+            <TextField label={t('field.track')} value={trackName} onChange={setTrackName} placeholder={t('placeholder.trackName')} />
+            <TextField label={t('field.release')} value={releaseName} onChange={setReleaseName} placeholder={t('placeholder.releaseCode')} />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.bottomTextSize')}</label>
+                <span className="text-xs text-neutral-600">{bottomFontSize}</span>
+              </div>
+              <input
+                type="range" min={24} max={80} step={1}
+                value={bottomFontSize}
+                onChange={(e) => setBottomFontSize(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+          </section>
+
+          {/* vinyl */}
+          <section className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.vinyl')}</p>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.discSize')}</label>
+                <span className="text-xs text-neutral-600">{vinylRadius.toFixed(2)}</span>
+              </div>
+              <input
+                type="range" min={0.2} max={0.6} step={0.01}
+                value={vinylRadius}
+                onChange={(e) => setVinylRadius(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.labelSize')}</label>
+                <span className="text-xs text-neutral-600">{labelRadius.toFixed(2)}</span>
+              </div>
+              <input
+                type="range" min={0.1} max={1.0} step={0.01}
+                value={labelRadius}
+                onChange={(e) => setLabelRadius(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+          </section>
+
+          {/* audio */}
+          <section className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.audio')}</p>
+            <FileField
+              label={t('field.soundtrack')}
+              accept={AUDIO_FILTERS}
+              value={audioPath}
+              onChange={setAudioPath}
+              placeholder={t('placeholder.uploadAudio')}
+            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.startTime')}</label>
+                <span className="text-xs text-neutral-600">
+                  {fmtTime(audioStartTime)}{audioDuration !== null ? ` / ${fmtTime(audioDuration)}` : ''}
+                </span>
+              </div>
+              <input
+                type="range" min={0} max={maxStartTime} step={1}
+                value={audioStartTime}
+                disabled={audioDuration === null}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setAudioStartTime(v)
+                  setDuration((prev) => Math.min(prev, Math.floor((audioDuration ?? 0) - v)))
+                }}
+                className="w-full accent-white disabled:opacity-30"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.duration')}</label>
+                <span className="text-xs text-neutral-600">
+                  {fmtTime(duration)}{audioDuration !== null ? ` — ${t('hint.max')} ${fmtTime(maxDuration)}` : ''}
+                </span>
+              </div>
+              <input
+                type="range" min={1} max={maxDuration || 600} step={1}
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="w-full accent-white"
+              />
+            </div>
+          </section>
+
+          <div className="mt-auto">
+            <ExportPanel
+              state={exportState}
+              canExport={canExport}
+              onExport={handleExport}
+              onReset={reset}
             />
           </div>
-        </section>
-
-        <div className="mt-auto">
-          <ExportPanel
-            state={exportState}
-            canExport={canExport}
-            onExport={handleExport}
-            onReset={reset}
-          />
-        </div>
-      </aside>
+        </aside>
+      </div>
 
       {/* right panel — preview */}
       <main className="flex-1 flex items-center justify-center bg-neutral-950 overflow-hidden p-6">
         {staticAssets ? (
-          <PreviewCanvas config={config} assets={assets} release={release} />
+          <PreviewCanvas config={config} assets={assets} release={release} audioSrc={audioBlobUrl} audioStartTime={audioStartTime} />
         ) : (
-          <p className="text-neutral-700 text-sm">loading assets…</p>
+          <p className="text-neutral-700 text-sm">{t('preview.loading')}</p>
         )}
       </main>
     </div>
