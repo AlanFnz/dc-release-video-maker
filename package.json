@@ -1,13 +1,13 @@
 {
   "name": "dc-release-video-maker",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Generate vinyl-style release videos for Dub Culture",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder",
+    "package": "electron-vite build && node scripts/fetch-ffmpeg-x64.mjs && electron-builder",
     "package:win": "electron-vite build && node scripts/fetch-ffmpeg-win.mjs && electron-builder --win",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
@@ -43,6 +43,7 @@
       "out/**/*",
       "resources/**/*"
     ],
+    "afterPack": "scripts/after-pack.cjs",
     "extraResources": [
       {
         "from": "node_modules/ffmpeg-static/ffmpeg",
@@ -50,7 +51,10 @@
       }
     ],
     "mac": {
-      "target": "dmg",
+      "target": {
+        "target": "dmg",
+        "arch": ["universal"]
+      },
       "category": "public.app-category.music",
       "icon": "resources/icon.png"
     },

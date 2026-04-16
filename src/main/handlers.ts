@@ -6,7 +6,8 @@ import { spawn } from 'child_process'
 import ffmpegStatic from 'ffmpeg-static'
 import Ffmpeg from 'fluent-ffmpeg'
 
-// in packaged builds ffmpeg is extracted to resources/ next to the app
+// in packaged builds ffmpeg is extracted to resources/ next to the app.
+// the universal build lipo-merges both arch slices into a single ffmpeg binary.
 const ffmpegPath = app.isPackaged
   ? join(process.resourcesPath, 'ffmpeg')
   : (ffmpegStatic as string)
