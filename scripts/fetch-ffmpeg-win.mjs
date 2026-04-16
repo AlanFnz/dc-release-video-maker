@@ -15,8 +15,8 @@ if (existsSync(dest)) {
 }
 
 const pkg = JSON.parse(readFileSync(join(root, 'node_modules', 'ffmpeg-static', 'package.json'), 'utf8'))
-const version = pkg.version
-const url = `https://github.com/eugeneware/ffmpeg-static/releases/download/b${version}/ffmpeg-win32-x64.gz`
+const releaseTag = pkg['ffmpeg-static']['binary-release-tag']
+const url = `https://github.com/eugeneware/ffmpeg-static/releases/download/${releaseTag}/ffmpeg-win32-x64.gz`
 
 console.log(`downloading ffmpeg.exe from ${url}`)
 
