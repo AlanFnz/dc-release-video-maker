@@ -56,6 +56,16 @@ export function drawFrame(
 
   // 5. canvas-wide noise — constant low level, boosted during glitches
   drawNoise(ctx, width, height, glitchIntensity)
+
+  // 6. fade to black overlay
+  if (config.fadeToBlack.enabled && config.fadeToBlack.duration > 0) {
+    const fadeStart = config.duration - config.fadeToBlack.duration
+    if (t >= fadeStart) {
+      const alpha = Math.min(1, (t - fadeStart) / config.fadeToBlack.duration)
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`
+      ctx.fillRect(0, 0, width, height)
+    }
+  }
 }
 
 // draws an image cover-fitted (no distortion) into dest rect, with optional zoom scale

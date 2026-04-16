@@ -21,7 +21,8 @@
     "labelSize": "Label size",
     "soundtrack": "Soundtrack",
     "startTime": "Start time",
-    "duration": "Duration (seconds)"
+    "duration": "Duration (seconds)",
+    "fadeToBlack": "Fade to black"
   },
   "hint": {
     "recommended": "recommended 1500×1500",

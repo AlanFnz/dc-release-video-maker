@@ -43,13 +43,16 @@ export default function App() {
   const [labelRadius, setLabelRadius] = useState(baseConfig.vinyl.labelRadiusFraction)
   const [backgroundScale, setBackgroundScale] = useState(baseConfig.backgroundScale)
   const [labelImageScale, setLabelImageScale] = useState(baseConfig.vinyl.labelImageScale)
+  const [fadeEnabled, setFadeEnabled] = useState(baseConfig.fadeToBlack.enabled)
+  const [fadeDuration, setFadeDuration] = useState(baseConfig.fadeToBlack.duration)
   const config = useMemo(() => ({
     ...baseConfig,
     duration,
     backgroundScale,
     font: { ...baseConfig.font, artistSize: bottomFontSize },
     vinyl: { ...baseConfig.vinyl, radiusFraction: vinylRadius, labelRadiusFraction: labelRadius, labelImageScale },
-  }), [duration, bottomFontSize, vinylRadius, labelRadius, backgroundScale, labelImageScale])
+    fadeToBlack: { enabled: fadeEnabled, duration: fadeDuration },
+  }), [duration, bottomFontSize, vinylRadius, labelRadius, backgroundScale, labelImageScale, fadeEnabled, fadeDuration])
 
   // loaded assets
   const [staticAssets, setStaticAssets] = useState<Assets | null>(null)
@@ -302,6 +305,29 @@ export default function App() {
                 onChange={(e) => setDuration(Number(e.target.value))}
                 className="w-full accent-white"
               />
+            </div>
+            {/* fade to black */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.fadeToBlack')}</label>
+                <button
+                  onClick={() => setFadeEnabled(v => !v)}
+                  className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${fadeEnabled ? 'bg-white' : 'bg-neutral-700'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${fadeEnabled ? 'translate-x-4 bg-neutral-900' : 'translate-x-0 bg-white'}`} />
+                </button>
+              </div>
+              {fadeEnabled && (
+                <div className="flex justify-between items-center gap-2">
+                  <input
+                    type="range" min={0.5} max={Math.min(10, duration)} step={0.5}
+                    value={fadeDuration}
+                    onChange={(e) => setFadeDuration(Number(e.target.value))}
+                    className="flex-1 accent-white"
+                  />
+                  <span className="text-xs text-neutral-600 shrink-0">{fadeDuration}s</span>
+                </div>
+              )}
             </div>
           </section>
 

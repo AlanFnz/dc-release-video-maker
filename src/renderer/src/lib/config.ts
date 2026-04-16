@@ -47,6 +47,11 @@ export interface CompositionConfig {
     artistName: { x: number; y: number; align: CanvasTextAlign }
     trackName: { x: number; y: number; align: CanvasTextAlign }
   }
+  fadeToBlack: {
+    enabled: boolean
+    // how many seconds before the end the fade starts
+    duration: number
+  }
   textures: TextureConfig[]
   font: {
     family: string
@@ -85,6 +90,10 @@ export const defaultConfig: CompositionConfig = {
     releaseName: { x: 0.955, y: 0.072, align: 'right' },
     artistName:  { x: 0.5,   y: 0.944, align: 'center' },
     trackName:   { x: 0.5,   y: 0.962, align: 'center' },
+  },
+  fadeToBlack: {
+    enabled: false,
+    duration: 2,
   },
   textures: [
     { src: 'texture1.png', blendMode: 'source-over', opacity: 0.15 },

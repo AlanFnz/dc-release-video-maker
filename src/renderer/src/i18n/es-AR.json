@@ -21,7 +21,8 @@
     "labelSize": "Tamaño de la etiqueta",
     "soundtrack": "Pista de audio",
     "startTime": "Tiempo de inicio",
-    "duration": "Duración (segundos)"
+    "duration": "Duración (segundos)",
+    "fadeToBlack": "Fundido a negro"
   },
   "hint": {
     "recommended": "recomendado 1500×1500",
