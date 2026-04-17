@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { defaultConfig } from './lib/config'
 import { loadStaticAssets, loadImageFromPath } from './lib/assets'
 import { useExport } from './lib/useExport'
-import { generateAppIcon } from './lib/generate-icon'
 import { useI18n } from './i18n'
 import type { Assets } from './lib/compositor'
 import { PreviewCanvas } from './components/preview-canvas'
@@ -23,28 +22,85 @@ function fmtTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
+function Sidebar({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative w-60 shrink-0">
+      <div
+        className="h-full overflow-y-auto flex flex-col p-5 gap-0 [scrollbar-width:thin] [scrollbar-color:#404040_transparent]"
+        style={{ maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)' }}
+      >
+        {children}
+        <div className="shrink-0 h-6" />
+      </div>
+    </div>
+  )
+}
+
+function SidebarGroup({ children, first = false }: { children: React.ReactNode; first?: boolean }) {
+  return (
+    <>
+      {!first && <div className="border-t border-neutral-800 -mx-5 my-4" />}
+      <div className="flex flex-col gap-3">
+        {children}
+      </div>
+    </>
+  )
+}
+
+function SliderField({ label, value, min, max, step, onChange, display, disabled }: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+  display?: string
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-between">
+        <label className="text-xs uppercase tracking-widest text-neutral-500">{label}</label>
+        <span className="text-xs text-neutral-600">{display ?? value}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-white disabled:opacity-30"
+      />
+    </div>
+  )
+}
+
 export default function App() {
   const { t, lang, setLang, languages } = useI18n()
   const baseConfig = defaultConfig
 
-  // form state
+  // release content
   const [artistName, setArtistName] = useState('')
   const [trackName, setTrackName] = useState('')
   const [releaseName, setReleaseName] = useState('')
   const [backgroundPath, setBackgroundPath] = useState<string | null>(null)
   const [vinylLabelPath, setVinylLabelPath] = useState<string | null>(null)
+
+  // visual settings
+  const [backgroundScale, setBackgroundScale] = useState(baseConfig.backgroundScale)
+  const [labelImageScale, setLabelImageScale] = useState(baseConfig.vinyl.labelImageScale)
+  const [bottomFontSize, setBottomFontSize] = useState(baseConfig.font.artistSize)
+  const [vinylRadius, setVinylRadius] = useState(baseConfig.vinyl.radiusFraction)
+  const [labelRadius, setLabelRadius] = useState(baseConfig.vinyl.labelRadiusFraction)
+
+  // audio settings
   const [audioPath, setAudioPath] = useState<string | null>(null)
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null)
   const [audioDuration, setAudioDuration] = useState<number | null>(null)
   const [audioStartTime, setAudioStartTime] = useState(0)
   const [duration, setDuration] = useState(baseConfig.duration)
-  const [bottomFontSize, setBottomFontSize] = useState(baseConfig.font.artistSize)
-  const [vinylRadius, setVinylRadius] = useState(baseConfig.vinyl.radiusFraction)
-  const [labelRadius, setLabelRadius] = useState(baseConfig.vinyl.labelRadiusFraction)
-  const [backgroundScale, setBackgroundScale] = useState(baseConfig.backgroundScale)
-  const [labelImageScale, setLabelImageScale] = useState(baseConfig.vinyl.labelImageScale)
   const [fadeEnabled, setFadeEnabled] = useState(baseConfig.fadeToBlack.enabled)
   const [fadeDuration, setFadeDuration] = useState(baseConfig.fadeToBlack.duration)
+
   const config = useMemo(() => ({
     ...baseConfig,
     duration,
@@ -59,33 +115,20 @@ export default function App() {
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [labelImage, setLabelImage] = useState<HTMLImageElement | null>(null)
 
-  // load static assets once (includes example placeholders)
   useEffect(() => {
-    loadStaticAssets()
-      .then(setStaticAssets)
-      .catch((e) => console.error('failed to load static assets', e))
+    loadStaticAssets().then(setStaticAssets).catch((e) => console.error('failed to load static assets', e))
   }, [])
 
-  // generate and set app icon after fonts load
-  useEffect(() => {
-    generateAppIcon()
-      .then((buf) => window.api.setAppIcon(buf))
-      .catch((e) => console.warn('icon generation failed:', e))
-  }, [])
-
-  // load background when path changes, fall back to example
   useEffect(() => {
     if (!backgroundPath) { setBgImage(null); return }
     loadImageFromPath(backgroundPath).then(setBgImage).catch(() => setBgImage(null))
   }, [backgroundPath])
 
-  // load vinyl label when path changes, fall back to example
   useEffect(() => {
     if (!vinylLabelPath) { setLabelImage(null); return }
     loadImageFromPath(vinylLabelPath).then(setLabelImage).catch(() => setLabelImage(null))
   }, [vinylLabelPath])
 
-  // probe duration + create blob URL when audio path changes
   useEffect(() => {
     if (!audioPath) { setAudioDuration(null); setAudioBlobUrl(null); return }
     Promise.all([
@@ -115,38 +158,26 @@ export default function App() {
 
   const { state: exportState, startExport, reset } = useExport(config, assets)
 
-  const sidebarRef = useRef<HTMLElement>(null)
-  const [atBottom, setAtBottom] = useState(false)
-  const checkBottom = useCallback(() => {
-    const el = sidebarRef.current
-    if (!el) return
-    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 4)
-  }, [])
-  useEffect(() => { checkBottom() }, [checkBottom])
-
-  const canExport = Boolean(
-    artistName && trackName && releaseName && backgroundPath && vinylLabelPath && audioPath
-  )
+  const canExport = Boolean(artistName && trackName && releaseName && backgroundPath && vinylLabelPath && audioPath)
 
   function handleExport() {
     if (!audioPath) return
     startExport(release, audioPath, config.duration, audioStartTime)
   }
 
-  // derived slider max values
   const maxStartTime = audioDuration !== null ? Math.max(0, Math.floor(audioDuration) - 1) : 0
   const maxDuration = audioDuration !== null ? Math.floor(audioDuration - audioStartTime) : 600
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden" style={{ paddingTop: '28px' }}>
-      {/* left panel — form */}
-      <div className="relative w-72 shrink-0 border-r border-neutral-800">
-        {!atBottom && (
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-neutral-950 to-transparent z-10" />
-        )}
-        <aside ref={sidebarRef} onScroll={checkBottom} className="h-full flex flex-col gap-5 overflow-y-scroll p-5 [scrollbar-width:thin] [scrollbar-color:#404040_transparent]">
+    <div className="flex h-screen w-screen overflow-hidden bg-neutral-950" style={{ paddingTop: '28px' }}>
+      {/* drag region for frameless window — must be explicit on macOS hiddenInset */}
+      <div className="fixed top-0 left-0 right-0 z-50" style={{ height: 28, WebkitAppRegion: 'drag' } as React.CSSProperties} />
 
-          {/* header + language selector */}
+      {/* left sidebar — content */}
+      <div className="border-r border-neutral-800">
+        <Sidebar>
+          {/* header */}
+          <SidebarGroup first>
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-xs font-medium tracking-widest uppercase text-neutral-400 leading-tight">
               {t('app.title')}
@@ -164,9 +195,10 @@ export default function App() {
               ))}
             </div>
           </div>
+          </SidebarGroup>
 
           {/* images */}
-          <section className="flex flex-col gap-3">
+          <SidebarGroup>
             <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.images')}</p>
             <FileField
               label={t('field.background')}
@@ -178,18 +210,12 @@ export default function App() {
               previewSrc={bgImage?.src ?? null}
               previewShape="square"
             />
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.backgroundScale')}</label>
-                <span className="text-xs text-neutral-600">{backgroundScale.toFixed(2)}</span>
-              </div>
-              <input
-                type="range" min={0.5} max={3.0} step={0.05}
-                value={backgroundScale}
-                onChange={(e) => setBackgroundScale(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
+            <SliderField
+              label={t('field.backgroundScale')}
+              value={backgroundScale} min={0.5} max={3.0} step={0.05}
+              display={backgroundScale.toFixed(2)}
+              onChange={setBackgroundScale}
+            />
             <FileField
               label={t('field.vinylLabel')}
               accept={IMAGE_FILTERS}
@@ -200,71 +226,70 @@ export default function App() {
               previewSrc={labelImage?.src ?? null}
               previewShape="circle"
             />
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.labelImageScale')}</label>
-                <span className="text-xs text-neutral-600">{labelImageScale.toFixed(2)}</span>
-              </div>
-              <input
-                type="range" min={0.5} max={3.0} step={0.05}
-                value={labelImageScale}
-                onChange={(e) => setLabelImageScale(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
-          </section>
+            <SliderField
+              label={t('field.labelImageScale')}
+              value={labelImageScale} min={0.5} max={3.0} step={0.05}
+              display={labelImageScale.toFixed(2)}
+              onChange={setLabelImageScale}
+            />
+          </SidebarGroup>
 
           {/* text */}
-          <section className="flex flex-col gap-3">
+          <SidebarGroup>
             <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.text')}</p>
             <TextField label={t('field.artist')} value={artistName} onChange={setArtistName} placeholder={t('placeholder.artistName')} />
             <TextField label={t('field.track')} value={trackName} onChange={setTrackName} placeholder={t('placeholder.trackName')} />
             <TextField label={t('field.release')} value={releaseName} onChange={setReleaseName} placeholder={t('placeholder.releaseCode')} />
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.bottomTextSize')}</label>
-                <span className="text-xs text-neutral-600">{bottomFontSize}</span>
-              </div>
-              <input
-                type="range" min={24} max={80} step={1}
-                value={bottomFontSize}
-                onChange={(e) => setBottomFontSize(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
-          </section>
+            <SliderField
+              label={t('field.bottomTextSize')}
+              value={bottomFontSize} min={24} max={80} step={1}
+              onChange={setBottomFontSize}
+            />
+          </SidebarGroup>
+        </Sidebar>
+      </div>
 
+      {/* center — preview + export */}
+      <main className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex items-center justify-center overflow-hidden p-6 min-h-0">
+          {staticAssets ? (
+            <PreviewCanvas config={config} assets={assets} release={release} audioSrc={audioBlobUrl} audioStartTime={audioStartTime} />
+          ) : (
+            <p className="text-neutral-700 text-sm">{t('preview.loading')}</p>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-neutral-800 px-6 py-4">
+          <ExportPanel
+            state={exportState}
+            canExport={canExport}
+            onExport={handleExport}
+            onReset={reset}
+          />
+        </div>
+      </main>
+
+      {/* right sidebar — settings */}
+      <div className="border-l border-neutral-800">
+        <Sidebar>
           {/* vinyl */}
-          <section className="flex flex-col gap-3">
+          <SidebarGroup first>
             <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.vinyl')}</p>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.discSize')}</label>
-                <span className="text-xs text-neutral-600">{vinylRadius.toFixed(2)}</span>
-              </div>
-              <input
-                type="range" min={0.2} max={0.6} step={0.01}
-                value={vinylRadius}
-                onChange={(e) => setVinylRadius(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.labelSize')}</label>
-                <span className="text-xs text-neutral-600">{labelRadius.toFixed(2)}</span>
-              </div>
-              <input
-                type="range" min={0.1} max={1.0} step={0.01}
-                value={labelRadius}
-                onChange={(e) => setLabelRadius(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
-          </section>
+            <SliderField
+              label={t('field.discSize')}
+              value={vinylRadius} min={0.2} max={0.6} step={0.01}
+              display={vinylRadius.toFixed(2)}
+              onChange={setVinylRadius}
+            />
+            <SliderField
+              label={t('field.labelSize')}
+              value={labelRadius} min={0.1} max={1.0} step={0.01}
+              display={labelRadius.toFixed(2)}
+              onChange={setLabelRadius}
+            />
+          </SidebarGroup>
 
           {/* audio */}
-          <section className="flex flex-col gap-3">
+          <SidebarGroup>
             <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.audio')}</p>
             <FileField
               label={t('field.soundtrack')}
@@ -273,39 +298,22 @@ export default function App() {
               onChange={setAudioPath}
               placeholder={t('placeholder.uploadAudio')}
             />
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.startTime')}</label>
-                <span className="text-xs text-neutral-600">
-                  {fmtTime(audioStartTime)}{audioDuration !== null ? ` / ${fmtTime(audioDuration)}` : ''}
-                </span>
-              </div>
-              <input
-                type="range" min={0} max={maxStartTime} step={1}
-                value={audioStartTime}
-                disabled={audioDuration === null}
-                onChange={(e) => {
-                  const v = Number(e.target.value)
-                  setAudioStartTime(v)
-                  setDuration((prev) => Math.min(prev, Math.floor((audioDuration ?? 0) - v)))
-                }}
-                className="w-full accent-white disabled:opacity-30"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <label className="text-xs uppercase tracking-widest text-neutral-500">{t('field.duration')}</label>
-                <span className="text-xs text-neutral-600">
-                  {fmtTime(duration)}{audioDuration !== null ? ` — ${t('hint.max')} ${fmtTime(maxDuration)}` : ''}
-                </span>
-              </div>
-              <input
-                type="range" min={1} max={maxDuration || 600} step={1}
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full accent-white"
-              />
-            </div>
+            <SliderField
+              label={t('field.startTime')}
+              value={audioStartTime} min={0} max={maxStartTime} step={1}
+              display={`${fmtTime(audioStartTime)}${audioDuration !== null ? ` / ${fmtTime(audioDuration)}` : ''}`}
+              disabled={audioDuration === null}
+              onChange={(v) => {
+                setAudioStartTime(v)
+                setDuration((prev) => Math.min(prev, Math.floor((audioDuration ?? 0) - v)))
+              }}
+            />
+            <SliderField
+              label={t('field.duration')}
+              value={duration} min={1} max={maxDuration || 600} step={1}
+              display={`${fmtTime(duration)}${audioDuration !== null ? ` — ${t('hint.max')} ${fmtTime(maxDuration)}` : ''}`}
+              onChange={setDuration}
+            />
             {/* fade to black */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
@@ -329,27 +337,10 @@ export default function App() {
                 </div>
               )}
             </div>
-          </section>
-
-          <div className="mt-auto">
-            <ExportPanel
-              state={exportState}
-              canExport={canExport}
-              onExport={handleExport}
-              onReset={reset}
-            />
-          </div>
-        </aside>
+          </SidebarGroup>
+        </Sidebar>
       </div>
 
-      {/* right panel — preview */}
-      <main className="flex-1 flex items-center justify-center bg-neutral-950 overflow-hidden p-6">
-        {staticAssets ? (
-          <PreviewCanvas config={config} assets={assets} release={release} audioSrc={audioBlobUrl} audioStartTime={audioStartTime} />
-        ) : (
-          <p className="text-neutral-700 text-sm">{t('preview.loading')}</p>
-        )}
-      </main>
     </div>
   )
 }
