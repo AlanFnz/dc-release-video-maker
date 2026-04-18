@@ -123,7 +123,7 @@ export function registerHandlers(): void {
   // receives webm buffer + audio path, outputs mp4
   ipcMain.handle(
     'export:video',
-    (e, webmBuffer: ArrayBuffer, audioPath: string, outputPath: string, duration: number, audioStartTime: number) => {
+    (e, webmBuffer: ArrayBuffer, audioPath: string, outputPath: string, duration: number, audioStartTime: number, fadeEnabled: boolean, fadeDuration: number) => {
       return new Promise<{ ok: true } | { ok: false; error: string }>((resolve) => {
         // write webm to temp file
         const tmp = join(tmpdir(), `vvg-${Date.now()}.webm`)
@@ -135,18 +135,24 @@ export function registerHandlers(): void {
           const audioInput = Ffmpeg().input(tmp).input(audioPath)
           if (audioStartTime > 0) audioInput.inputOptions([`-ss ${audioStartTime}`])
 
+          const outputOpts = [
+            `-t ${duration}`,
+            '-c:v libx264',
+            '-preset fast',
+            '-crf 18',
+            '-pix_fmt yuv420p',
+            '-c:a aac',
+            '-b:a 320k',
+            '-shortest',
+            '-movflags +faststart',
+          ]
+          if (fadeEnabled && fadeDuration > 0) {
+            const fadeStart = Math.max(0, duration - fadeDuration)
+            outputOpts.push(`-af afade=t=out:st=${fadeStart}:d=${fadeDuration}`)
+          }
+
           const cmd = audioInput
-            .outputOptions([
-              `-t ${duration}`,
-              '-c:v libx264',
-              '-preset fast',
-              '-crf 18',
-              '-pix_fmt yuv420p',
-              '-c:a aac',
-              '-b:a 320k',
-              '-shortest',
-              '-movflags +faststart',
-            ])
+            .outputOptions(outputOpts)
             .output(outputPath)
             .on('progress', (info) => {
               // parse timemark "HH:MM:SS.ss" → progress 0–1

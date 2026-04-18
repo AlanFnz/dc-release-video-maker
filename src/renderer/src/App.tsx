@@ -162,7 +162,7 @@ export default function App() {
 
   function handleExport() {
     if (!audioPath) return
-    startExport(release, audioPath, config.duration, audioStartTime)
+    startExport(release, audioPath, config.duration, audioStartTime, fadeEnabled, fadeDuration)
   }
 
   function handleNew() {
