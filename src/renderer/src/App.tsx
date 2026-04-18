@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { defaultConfig } from './lib/config'
 import { loadStaticAssets, loadImageFromPath } from './lib/assets'
-import { useExport } from './lib/useExport'
+import { useExport, type ProjectData } from './lib/useExport'
 import { useI18n } from './i18n'
 import type { Assets } from './lib/compositor'
 import { PreviewCanvas } from './components/preview-canvas'
@@ -165,6 +165,58 @@ export default function App() {
     startExport(release, audioPath, config.duration, audioStartTime)
   }
 
+  function handleNew() {
+    setArtistName('')
+    setTrackName('')
+    setReleaseName('')
+    setBackgroundPath(null)
+    setVinylLabelPath(null)
+    setAudioPath(null)
+    setBackgroundScale(baseConfig.backgroundScale)
+    setLabelImageScale(baseConfig.vinyl.labelImageScale)
+    setBottomFontSize(baseConfig.font.artistSize)
+    setVinylRadius(baseConfig.vinyl.radiusFraction)
+    setLabelRadius(baseConfig.vinyl.labelRadiusFraction)
+    setAudioStartTime(0)
+    setDuration(baseConfig.duration)
+    setFadeEnabled(baseConfig.fadeToBlack.enabled)
+    setFadeDuration(baseConfig.fadeToBlack.duration)
+  }
+
+  async function handleSave() {
+    const data: ProjectData = {
+      version: 1,
+      artistName, trackName, releaseName,
+      backgroundPath, vinylLabelPath, audioPath,
+      backgroundScale, labelImageScale, bottomFontSize,
+      vinylRadius, labelRadius,
+      audioStartTime, duration,
+      fadeEnabled, fadeDuration,
+    }
+    const name = releaseName ? `${releaseName}.dcproject` : 'project.dcproject'
+    await window.api.saveProject(data, name)
+  }
+
+  async function handleLoad() {
+    const data = await window.api.loadProject()
+    if (!data) return
+    setArtistName(data.artistName ?? '')
+    setTrackName(data.trackName ?? '')
+    setReleaseName(data.releaseName ?? '')
+    setBackgroundPath(data.backgroundPath ?? null)
+    setVinylLabelPath(data.vinylLabelPath ?? null)
+    setAudioPath(data.audioPath ?? null)
+    setBackgroundScale(data.backgroundScale ?? 1)
+    setLabelImageScale(data.labelImageScale ?? 1)
+    setBottomFontSize(data.bottomFontSize ?? 58)
+    setVinylRadius(data.vinylRadius ?? 0.45)
+    setLabelRadius(data.labelRadius ?? 1)
+    setAudioStartTime(data.audioStartTime ?? 0)
+    setDuration(data.duration ?? 60)
+    setFadeEnabled(data.fadeEnabled ?? false)
+    setFadeDuration(data.fadeDuration ?? 2)
+  }
+
   const maxStartTime = audioDuration !== null ? Math.max(0, Math.floor(audioDuration) - 1) : 0
   const maxDuration = audioDuration !== null ? Math.floor(audioDuration - audioStartTime) : 600
 
@@ -178,23 +230,23 @@ export default function App() {
         <Sidebar>
           {/* header */}
           <SidebarGroup first>
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-xs font-medium tracking-widest uppercase text-neutral-400 leading-tight">
-              {t('app.title')}
-            </h1>
-            <div className="flex gap-1 shrink-0">
-              {(Object.keys(languages) as (keyof typeof languages)[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLang(l)}
-                  title={languages[l].label}
-                  className={`text-base leading-none transition-opacity ${lang === l ? 'opacity-100' : 'opacity-30 hover:opacity-60'}`}
-                >
-                  {languages[l].flag}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-xs font-medium tracking-widest uppercase text-neutral-400 leading-tight">
+                {t('app.title')}
+              </h1>
+              <div className="flex gap-1 shrink-0">
+                {(Object.keys(languages) as (keyof typeof languages)[]).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLang(l)}
+                    title={languages[l].label}
+                    className={`text-base leading-none transition-opacity ${lang === l ? 'opacity-100' : 'opacity-30 hover:opacity-60'}`}
+                  >
+                    {languages[l].flag}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
           </SidebarGroup>
 
           {/* images */}
@@ -258,13 +310,36 @@ export default function App() {
             <p className="text-neutral-700 text-sm">{t('preview.loading')}</p>
           )}
         </div>
-        <div className="shrink-0 border-t border-neutral-800 px-6 py-4">
-          <ExportPanel
-            state={exportState}
-            canExport={canExport}
-            onExport={handleExport}
-            onReset={reset}
-          />
+        <div className="shrink-0 border-t border-neutral-800 px-6 py-4 flex items-center gap-4">
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleNew}
+              className="rounded border border-neutral-700 text-neutral-400 text-sm py-2 px-3 hover:border-neutral-500 transition-colors"
+            >
+              {t('project.new')}
+            </button>
+            <button
+              onClick={handleSave}
+              className="rounded border border-neutral-700 text-neutral-400 text-sm py-2 px-3 hover:border-neutral-500 transition-colors"
+            >
+              {t('project.save')}
+            </button>
+            <button
+              onClick={handleLoad}
+              className="rounded border border-neutral-700 text-neutral-400 text-sm py-2 px-3 hover:border-neutral-500 transition-colors"
+            >
+              {t('project.load')}
+            </button>
+          </div>
+          <div className="w-px self-stretch bg-neutral-800 shrink-0" />
+          <div className="flex-1">
+            <ExportPanel
+              state={exportState}
+              canExport={canExport}
+              onExport={handleExport}
+              onReset={reset}
+            />
+          </div>
         </div>
       </main>
 
