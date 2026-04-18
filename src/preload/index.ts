@@ -19,6 +19,12 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('export:progress', handler)
   },
 
+  saveProject: (data: object, defaultName: string) =>
+    ipcRenderer.invoke('project:save', data, defaultName),
+
+  loadProject: () =>
+    ipcRenderer.invoke('project:load'),
+
   openFile: (filters: Electron.FileFilter[]) =>
     ipcRenderer.invoke('dialog:openFile', filters),
 

@@ -46,5 +46,10 @@
   },
   "preview": {
     "loading": "loading assets…"
+  },
+  "project": {
+    "new": "New",
+    "save": "Save",
+    "load": "Load"
   }
 }

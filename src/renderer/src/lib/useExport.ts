@@ -15,6 +15,25 @@ export interface ExportState {
 
 interface FileFilter { name: string; extensions: string[] }
 
+export interface ProjectData {
+  version: 1
+  artistName: string
+  trackName: string
+  releaseName: string
+  backgroundPath: string | null
+  vinylLabelPath: string | null
+  audioPath: string | null
+  backgroundScale: number
+  labelImageScale: number
+  bottomFontSize: number
+  vinylRadius: number
+  labelRadius: number
+  audioStartTime: number
+  duration: number
+  fadeEnabled: boolean
+  fadeDuration: number
+}
+
 declare global {
   interface Window {
     api: {
@@ -22,6 +41,8 @@ declare global {
       getAudioDuration: (filePath: string) => Promise<number>
       readAudioBuffer: (filePath: string) => Promise<{ buffer: ArrayBuffer; mimeType: string }>
       setAppIcon: (buffer: ArrayBuffer) => Promise<void>
+      saveProject: (data: object, defaultName: string) => Promise<string | null>
+      loadProject: () => Promise<ProjectData | null>
       openFile: (filters: FileFilter[]) => Promise<string | null>
       saveFile: (defaultName: string) => Promise<string | null>
       exportVideo: (

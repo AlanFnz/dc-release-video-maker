@@ -89,6 +89,28 @@ export function registerHandlers(): void {
     return canceled ? null : filePaths[0]
   })
 
+  // save project JSON to a user-chosen .dcproject file
+  ipcMain.handle('project:save', async (_e, data: object, defaultName: string) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath: join(app.getPath('desktop'), defaultName),
+      filters: [{ name: 'DC Project', extensions: ['dcproject'] }],
+    })
+    if (canceled || !filePath) return null
+    writeFileSync(filePath, JSON.stringify(data, null, 2))
+    return filePath
+  })
+
+  // open a .dcproject file and return its parsed contents
+  ipcMain.handle('project:load', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'DC Project', extensions: ['dcproject'] }],
+    })
+    if (canceled || !filePaths[0]) return null
+    const content = readFileSync(filePaths[0], 'utf8')
+    return JSON.parse(content)
+  })
+
   // open a save dialog and return the chosen path
   ipcMain.handle('dialog:saveFile', async (_e, defaultName: string) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
