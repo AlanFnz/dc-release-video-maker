@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('api', {
     audioPath: string,
     outputPath: string,
     duration: number,
-    audioStartTime: number
-  ) => ipcRenderer.invoke('export:video', webmBuffer, audioPath, outputPath, duration, audioStartTime),
+    audioStartTime: number,
+    fadeEnabled: boolean,
+    fadeDuration: number,
+  ) => ipcRenderer.invoke('export:video', webmBuffer, audioPath, outputPath, duration, audioStartTime, fadeEnabled, fadeDuration),
 })

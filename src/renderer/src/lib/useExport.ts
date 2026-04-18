@@ -50,7 +50,9 @@ declare global {
         audioPath: string,
         outputPath: string,
         duration: number,
-        audioStartTime: number
+        audioStartTime: number,
+        fadeEnabled: boolean,
+        fadeDuration: number,
       ) => Promise<{ ok: true } | { ok: false; error: string }>
       onExportProgress: (cb: (progress: number) => void) => () => void
     }
@@ -62,7 +64,7 @@ export function useExport(config: CompositionConfig, assets: Assets) {
   const abortRef = useRef(false)
 
   const startExport = useCallback(
-    async (release: ReleaseData, audioPath: string, duration: number, audioStartTime: number) => {
+    async (release: ReleaseData, audioPath: string, duration: number, audioStartTime: number, fadeEnabled: boolean, fadeDuration: number) => {
       abortRef.current = false
       setState({ status: 'recording', progress: 0, error: null })
 
@@ -153,7 +155,7 @@ export function useExport(config: CompositionConfig, assets: Assets) {
         })
 
         // hand off to main process for ffmpeg muxing
-        const result = await window.api.exportVideo(webmBuffer, audioPath, outputPath, duration, audioStartTime)
+        const result = await window.api.exportVideo(webmBuffer, audioPath, outputPath, duration, audioStartTime, fadeEnabled, fadeDuration)
         unsubProgress()
 
         if (result.ok) {
