@@ -2,10 +2,10 @@
 
 @font-face {
   font-family: 'Tactic Round';
-  src: url('./assets/fonts/TacticRound.woff2') format('woff2'),
-       url('./assets/fonts/TacticRound.otf') format('opentype');
+  src: url('./assets/fonts/TacticRound-Bld.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 
 * {
