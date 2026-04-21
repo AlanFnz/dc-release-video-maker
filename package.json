@@ -28,6 +28,7 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.13.0",
     "electron-vite": "^2.3.0",
+    "opentype.js": "^2.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "sharp": "^0.34.5",
