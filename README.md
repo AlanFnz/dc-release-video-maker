@@ -68,6 +68,8 @@ Packaged files are written to `dist-electron/`.
 
 The macOS package script generates the app icon, builds the Electron application, downloads the x64 FFmpeg binary when needed, and combines the x64 and arm64 app slices into a universal build.
 
+Merging the slices invalidates Electron's code signature, so the script ad-hoc signs the universal app (see `scripts/after-pack.cjs`). This needs no certificate and is enough to run the app on the Mac that built it. If a valid Developer ID certificate is available, electron-builder signs the app with it instead. Distributing the app to other Macs still requires a Developer ID certificate and notarization; otherwise Gatekeeper will warn on first launch.
+
 ## Usage
 
 1. Choose a square background image and vinyl label image.
