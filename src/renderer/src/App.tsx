@@ -24,10 +24,13 @@ function fmtTime(s: number): string {
 
 function Sidebar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative w-60 shrink-0">
+    // h-full lets the scroll container below resolve its own h-full against the window height;
+    // without it this wrapper sizes to its content and the sidebar never scrolls.
+    <div className="relative w-60 shrink-0 h-full">
       <div
         className="h-full overflow-y-auto flex flex-col p-5 gap-0 [scrollbar-width:thin] [scrollbar-color:#404040_transparent]"
-        style={{ maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)' }}
+        // fade height must stay within the bottom padding + spacer (44px) so the last field is fully opaque when scrolled to the end
+        style={{ maskImage: 'linear-gradient(to bottom, black calc(100% - 40px), transparent 100%)' }}
       >
         {children}
         <div className="shrink-0 h-6" />
