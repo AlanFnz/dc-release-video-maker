@@ -4,6 +4,7 @@
   },
   "section": {
     "images": "images",
+    "logo": "logo",
     "text": "text",
     "vinyl": "vinyl",
     "audio": "audio"
@@ -22,19 +23,30 @@
     "soundtrack": "Soundtrack",
     "startTime": "Start time",
     "duration": "Duration (seconds)",
-    "fadeToBlack": "Fade to black"
+    "fadeToBlack": "Fade to black",
+    "logoText": "Logo text",
+    "logoImage": "Logo image",
+    "logoSize": "Logo size",
+    "logoX": "Logo position X",
+    "logoY": "Logo position Y",
+    "font": "Font",
+    "clear": "Remove"
   },
   "hint": {
     "recommended": "recommended 1500×1500",
     "max": "max",
-    "maxSeconds": "max {{n}}s"
+    "maxSeconds": "max {{n}}s",
+    "logoReplacesText": "replaced by the logo image",
+    "fontDefault": "default: Tactic Round"
   },
   "placeholder": {
     "chooseImage": "choose image…",
     "uploadAudio": "upload audio file",
     "artistName": "Artist Name",
     "trackName": "Track Name",
-    "releaseCode": "DUBC000"
+    "releaseCode": "DUBC000",
+    "chooseFont": "choose font…",
+    "logoText": "DUB CULTURE"
   },
   "export": {
     "button": "export mp4",
@@ -51,5 +63,11 @@
     "new": "New",
     "save": "Save",
     "load": "Load"
+  },
+  "error": {
+    "font": "Could not load this font file"
+  },
+  "action": {
+    "resetFont": "Back to the default font"
   }
 }

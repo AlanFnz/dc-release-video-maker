@@ -24,6 +24,19 @@ export async function loadImageFromPath(filePath: string): Promise<HTMLImageElem
   return loadImage(dataUrl)
 }
 
+let customFontSeq = 0
+
+// load a user-chosen font file (ttf/otf/woff/woff2) as a FontFace under a unique family name.
+// the caller registers it with document.fonts once it decides to use it.
+// `family` is the exact name given to the constructor: face.family reads back quoted
+// ('"DC Custom Font 1"') when it contains spaces, which would not match in a canvas font string.
+export async function loadFontFromPath(filePath: string): Promise<{ face: FontFace; family: string }> {
+  const dataUrl = await window.api.readAsDataUrl(filePath)
+  const family = `DC Custom Font ${++customFontSeq}`
+  const face = await new FontFace(family, `url(${dataUrl})`).load()
+  return { face, family }
+}
+
 // load all static assets bundled with the app
 export async function loadStaticAssets(): Promise<Assets> {
   const [t1, t2, t3, disc, bg, label] = await Promise.all([
@@ -39,5 +52,6 @@ export async function loadStaticAssets(): Promise<Assets> {
     textures: [t1, t2, t3],
     background: bg,
     vinylLabel: label,
+    logo: null,
   }
 }

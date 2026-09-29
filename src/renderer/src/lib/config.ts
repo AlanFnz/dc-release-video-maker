@@ -47,6 +47,14 @@ export interface CompositionConfig {
     artistName: { x: number; y: number; align: CanvasTextAlign }
     trackName: { x: number; y: number; align: CanvasTextAlign }
   }
+  // optional user-supplied logo image that replaces the labelName text
+  logo: {
+    // longest side of the image as a fraction of canvas width
+    size: number
+    // top-left corner as fractions of canvas width/height
+    x: number
+    y: number
+  }
   fadeToBlack: {
     enabled: boolean
     // how many seconds before the end the fade starts
@@ -90,6 +98,11 @@ export const defaultConfig: CompositionConfig = {
     releaseName: { x: 0.955, y: 0.072, align: 'right' },
     artistName:  { x: 0.5,   y: 0.944, align: 'center' },
     trackName:   { x: 0.5,   y: 0.962, align: 'center' },
+  },
+  logo: {
+    size: 0.18,
+    x: 0.045,
+    y: 0.045,
   },
   fadeToBlack: {
     enabled: false,

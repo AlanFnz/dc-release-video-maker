@@ -7,7 +7,8 @@ DC Release Video Maker is a desktop app for creating square, vinyl-style release
 - Real-time 1500 x 1500 video preview
 - Custom background and vinyl label artwork
 - Adjustable artwork scale, disc size, label size, and text size
-- Artist, track, and release code overlays using Tactic Round
+- Artist, track, and release code overlays using Tactic Round, or any `.ttf`, `.otf`, `.woff`, or `.woff2` font you choose
+- Editable logo text, or replace it with any PNG, JPG, or WebP image with adjustable size and position
 - Animated decoder reveal, RGB split, glow, noise, and glitch effects
 - Configurable audio start time and video duration
 - Optional synchronized audio fade and fade to black
@@ -71,8 +72,9 @@ The macOS package script generates the app icon, builds the Electron application
 
 1. Choose a square background image and vinyl label image.
 2. Enter the artist, track, and release code.
-3. Load an audio file and select its start time.
-4. Adjust the composition, duration, and fade settings while watching the preview.
-5. Select **Export MP4** and choose an output location.
+3. Optionally edit the logo text, or choose a logo image to replace it and adjust its size and position. Choose a font file to change the typeface of all text; use **×** to go back to the default.
+4. Load an audio file and select its start time.
+5. Adjust the composition, duration, and fade settings while watching the preview.
+6. Select **Export MP4** and choose an output location.
 
 Use **Save** to store the current setup as a `.dcproject` file and **Load** to continue working on it later.

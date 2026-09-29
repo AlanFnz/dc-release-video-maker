@@ -8,19 +8,22 @@ interface FileFieldProps {
   accept: FileFilter[]
   value: string | null
   onChange: (path: string) => void
+  // when provided, a clear button is shown while a file is selected
+  onClear?: () => void
+  clearLabel?: string
   placeholder?: string
   hint?: string
   previewSrc?: string | null
   previewShape?: 'circle' | 'square'
 }
 
-export function FileField({ label, accept, value, onChange, placeholder, hint, previewSrc, previewShape = 'square' }: FileFieldProps) {
+export function FileField({ label, accept, value, onChange, onClear, clearLabel, placeholder, hint, previewSrc, previewShape = 'square' }: FileFieldProps) {
   async function handleClick() {
     const path = await window.api.openFile(accept)
     if (path) onChange(path)
   }
 
-  const displayName = value ? value.split('/').pop() ?? value : null
+  const displayName = value ? value.split(/[\\/]/).pop() ?? value : null
 
   return (
     <div className="flex flex-col gap-1">
@@ -47,6 +50,16 @@ export function FileField({ label, accept, value, onChange, placeholder, hint, p
             {displayName ?? placeholder ?? 'choose file…'}
           </span>
         </button>
+        {onClear && value && (
+          <button
+            onClick={onClear}
+            title={clearLabel}
+            aria-label={clearLabel}
+            className="shrink-0 w-8 self-stretch rounded border border-neutral-700 text-neutral-400 text-sm hover:border-neutral-500 hover:text-neutral-200 transition-colors"
+          >
+            ×
+          </button>
+        )}
       </div>
       {hint && <p className="text-xs text-neutral-600">{hint}</p>}
     </div>

@@ -18,6 +18,8 @@ export interface Assets {
   background: HTMLImageElement | null
   vinylDisc: HTMLImageElement | null
   vinylLabel: HTMLImageElement | null
+  // when set, drawn in place of the labelName text
+  logo: HTMLImageElement | null
   textures: (HTMLImageElement | null)[]
 }
 
@@ -51,8 +53,9 @@ export function drawFrame(
   // 3. vinyl disc
   drawVinyl(ctx, assets, config, t, width, height)
 
-  // 4. text overlays
-  drawText(ctx, frame, release, config, width, height, glitchIntensity, t)
+  // 4. logo + text overlays
+  if (assets.logo) drawLogo(ctx, assets.logo, config, width, height)
+  drawText(ctx, frame, release, config, width, height, glitchIntensity, t, assets.logo !== null)
 
   // 5. canvas-wide noise — constant low level, boosted during glitches
   drawNoise(ctx, width, height, glitchIntensity)
@@ -167,6 +170,23 @@ function drawVinyl(
   ctx.restore()
 }
 
+// draws the logo aspect-fit inside a square of `size` × canvas width, anchored at its top-left corner
+function drawLogo(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  config: CompositionConfig,
+  w: number,
+  h: number
+): void {
+  const { size, x, y } = config.logo
+  const scale = (size * w) / Math.max(img.width, img.height)
+
+  ctx.save()
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, x * w, y * h, img.width * scale, img.height * scale)
+  ctx.restore()
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   _frame: FrameInput,
@@ -175,7 +195,8 @@ function drawText(
   w: number,
   h: number,
   intensity: number,
-  t: number
+  t: number,
+  hasLogo: boolean
 ): void {
   const { font, layout, glitch } = config
   const px = (size: number) => `${Math.round(size * (w / 1500))}px`
@@ -188,7 +209,7 @@ function drawText(
     size: number
     useGlitch: boolean
   }> = [
-    { text: config.labelName,      pos: layout.labelName,   size: font.labelSize,   useGlitch: false },
+    ...(hasLogo ? [] : [{ text: config.labelName, pos: layout.labelName, size: font.labelSize, useGlitch: false }]),
     { text: release.releaseName.toUpperCase(),   pos: layout.releaseName, size: font.releaseSize, useGlitch: false },
     {
       text: `${release.artistName} - ${release.trackName}`.toUpperCase(),

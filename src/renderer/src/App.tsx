@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { defaultConfig } from './lib/config'
-import { loadStaticAssets, loadImageFromPath } from './lib/assets'
+import { loadStaticAssets, loadImageFromPath, loadFontFromPath } from './lib/assets'
 import { useExport, type ProjectData } from './lib/useExport'
 import { useI18n } from './i18n'
 import type { Assets } from './lib/compositor'
@@ -14,6 +14,9 @@ const IMAGE_FILTERS: FileFilter[] = [
 ]
 const AUDIO_FILTERS: FileFilter[] = [
   { name: 'Audio', extensions: ['mp3', 'wav', 'aac', 'm4a', 'flac'] },
+]
+const FONT_FILTERS: FileFilter[] = [
+  { name: 'Fonts', extensions: ['ttf', 'otf', 'woff', 'woff2'] },
 ]
 
 function fmtTime(s: number): string {
@@ -95,6 +98,17 @@ export default function App() {
   const [vinylRadius, setVinylRadius] = useState(baseConfig.vinyl.radiusFraction)
   const [labelRadius, setLabelRadius] = useState(baseConfig.vinyl.labelRadiusFraction)
 
+  // logo (image replaces the text when set) and font
+  const [logoText, setLogoText] = useState(baseConfig.labelName)
+  const [logoPath, setLogoPath] = useState<string | null>(null)
+  const [logoSize, setLogoSize] = useState(baseConfig.logo.size)
+  const [logoX, setLogoX] = useState(baseConfig.logo.x)
+  const [logoY, setLogoY] = useState(baseConfig.logo.y)
+  const [fontPath, setFontPath] = useState<string | null>(null)
+  const [fontFamily, setFontFamily] = useState<string | null>(null)
+  const [fontError, setFontError] = useState(false)
+  const fontFaceRef = useRef<FontFace | null>(null)
+
   // audio settings
   const [audioPath, setAudioPath] = useState<string | null>(null)
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null)
@@ -106,17 +120,20 @@ export default function App() {
 
   const config = useMemo(() => ({
     ...baseConfig,
+    labelName: logoText,
     duration,
     backgroundScale,
-    font: { ...baseConfig.font, artistSize: bottomFontSize },
+    font: { ...baseConfig.font, family: fontFamily ?? baseConfig.font.family, artistSize: bottomFontSize },
     vinyl: { ...baseConfig.vinyl, radiusFraction: vinylRadius, labelRadiusFraction: labelRadius, labelImageScale },
+    logo: { size: logoSize, x: logoX, y: logoY },
     fadeToBlack: { enabled: fadeEnabled, duration: fadeDuration },
-  }), [duration, bottomFontSize, vinylRadius, labelRadius, backgroundScale, labelImageScale, fadeEnabled, fadeDuration])
+  }), [logoText, duration, bottomFontSize, fontFamily, vinylRadius, labelRadius, backgroundScale, labelImageScale, logoSize, logoX, logoY, fadeEnabled, fadeDuration])
 
   // loaded assets
   const [staticAssets, setStaticAssets] = useState<Assets | null>(null)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [labelImage, setLabelImage] = useState<HTMLImageElement | null>(null)
+  const [logoImage, setLogoImage] = useState<HTMLImageElement | null>(null)
 
   useEffect(() => {
     loadStaticAssets().then(setStaticAssets).catch((e) => console.error('failed to load static assets', e))
@@ -131,6 +148,38 @@ export default function App() {
     if (!vinylLabelPath) { setLabelImage(null); return }
     loadImageFromPath(vinylLabelPath).then(setLabelImage).catch(() => setLabelImage(null))
   }, [vinylLabelPath])
+
+  useEffect(() => {
+    if (!logoPath) { setLogoImage(null); return }
+    loadImageFromPath(logoPath).then(setLogoImage).catch(() => setLogoImage(null))
+  }, [logoPath])
+
+  // register the chosen font with the document (canvas can only use registered fonts).
+  // the previous face is dropped only once the new one is ready, so text never flashes a fallback font.
+  useEffect(() => {
+    let cancelled = false
+    const drop = () => {
+      if (fontFaceRef.current) document.fonts.delete(fontFaceRef.current)
+      fontFaceRef.current = null
+    }
+    setFontError(false)
+    if (!fontPath) { drop(); setFontFamily(null); return }
+    loadFontFromPath(fontPath)
+      .then(({ face, family }) => {
+        if (cancelled) return
+        drop()
+        document.fonts.add(face)
+        fontFaceRef.current = face
+        setFontFamily(family)
+      })
+      .catch(() => {
+        if (cancelled) return
+        drop()
+        setFontFamily(null)
+        setFontError(true)
+      })
+    return () => { cancelled = true }
+  }, [fontPath])
 
   useEffect(() => {
     if (!audioPath) { setAudioDuration(null); setAudioBlobUrl(null); return }
@@ -150,8 +199,9 @@ export default function App() {
     background: bgImage ?? staticAssets?.background ?? null,
     vinylDisc: staticAssets?.vinylDisc ?? null,
     vinylLabel: labelImage ?? staticAssets?.vinylLabel ?? null,
+    logo: logoImage,
     textures: staticAssets?.textures ?? [],
-  }), [bgImage, labelImage, staticAssets])
+  }), [bgImage, labelImage, logoImage, staticAssets])
 
   const release = useMemo(() => ({
     artistName: artistName || 'Artist Name',
@@ -180,6 +230,12 @@ export default function App() {
     setBottomFontSize(baseConfig.font.artistSize)
     setVinylRadius(baseConfig.vinyl.radiusFraction)
     setLabelRadius(baseConfig.vinyl.labelRadiusFraction)
+    setLogoText(baseConfig.labelName)
+    setLogoPath(null)
+    setLogoSize(baseConfig.logo.size)
+    setLogoX(baseConfig.logo.x)
+    setLogoY(baseConfig.logo.y)
+    setFontPath(null)
     setAudioStartTime(0)
     setDuration(baseConfig.duration)
     setFadeEnabled(baseConfig.fadeToBlack.enabled)
@@ -195,6 +251,7 @@ export default function App() {
       vinylRadius, labelRadius,
       audioStartTime, duration,
       fadeEnabled, fadeDuration,
+      logoText, logoPath, logoSize, logoX, logoY, fontPath,
     }
     const name = releaseName ? `${releaseName}.dcproject` : 'project.dcproject'
     await window.api.saveProject(data, name)
@@ -214,6 +271,12 @@ export default function App() {
     setBottomFontSize(data.bottomFontSize ?? 58)
     setVinylRadius(data.vinylRadius ?? 0.45)
     setLabelRadius(data.labelRadius ?? 1)
+    setLogoText(data.logoText ?? baseConfig.labelName)
+    setLogoPath(data.logoPath ?? null)
+    setLogoSize(data.logoSize ?? baseConfig.logo.size)
+    setLogoX(data.logoX ?? baseConfig.logo.x)
+    setLogoY(data.logoY ?? baseConfig.logo.y)
+    setFontPath(data.fontPath ?? null)
     setAudioStartTime(data.audioStartTime ?? 0)
     setDuration(data.duration ?? 60)
     setFadeEnabled(data.fadeEnabled ?? false)
@@ -289,6 +352,51 @@ export default function App() {
             />
           </SidebarGroup>
 
+          {/* logo — the image replaces the text when set */}
+          <SidebarGroup>
+            <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.logo')}</p>
+            <TextField
+              label={t('field.logoText')}
+              value={logoText}
+              onChange={setLogoText}
+              placeholder={t('placeholder.logoText')}
+              disabled={logoImage !== null}
+            />
+            <FileField
+              label={t('field.logoImage')}
+              accept={IMAGE_FILTERS}
+              value={logoPath}
+              onChange={setLogoPath}
+              onClear={() => setLogoPath(null)}
+              clearLabel={t('field.clear')}
+              placeholder={t('placeholder.chooseImage')}
+              hint={logoImage ? t('hint.logoReplacesText') : undefined}
+              previewSrc={logoImage?.src ?? null}
+              previewShape="square"
+            />
+            <SliderField
+              label={t('field.logoSize')}
+              value={logoSize} min={0.05} max={0.6} step={0.01}
+              display={logoSize.toFixed(2)}
+              disabled={logoImage === null}
+              onChange={setLogoSize}
+            />
+            <SliderField
+              label={t('field.logoX')}
+              value={logoX} min={0} max={0.95} step={0.005}
+              display={logoX.toFixed(3)}
+              disabled={logoImage === null}
+              onChange={setLogoX}
+            />
+            <SliderField
+              label={t('field.logoY')}
+              value={logoY} min={0} max={0.95} step={0.005}
+              display={logoY.toFixed(3)}
+              disabled={logoImage === null}
+              onChange={setLogoY}
+            />
+          </SidebarGroup>
+
           {/* text */}
           <SidebarGroup>
             <p className="text-xs uppercase tracking-widest text-neutral-600">{t('section.text')}</p>
@@ -300,6 +408,25 @@ export default function App() {
               value={bottomFontSize} min={24} max={80} step={1}
               onChange={setBottomFontSize}
             />
+            <FileField
+              label={t('field.font')}
+              accept={FONT_FILTERS}
+              value={fontPath}
+              onChange={setFontPath}
+              onClear={() => setFontPath(null)}
+              clearLabel={t('field.clear')}
+              placeholder={t('placeholder.chooseFont')}
+              hint={fontPath ? undefined : t('hint.fontDefault')}
+            />
+            {fontError && <p className="text-xs text-red-400">{t('error.font')}</p>}
+            {fontPath && (
+              <button
+                onClick={() => setFontPath(null)}
+                className="self-start text-left text-xs text-neutral-500 underline underline-offset-2 hover:text-neutral-300 transition-colors"
+              >
+                {t('action.resetFont')}
+              </button>
+            )}
           </SidebarGroup>
         </Sidebar>
       </div>

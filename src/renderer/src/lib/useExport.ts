@@ -32,6 +32,13 @@ export interface ProjectData {
   duration: number
   fadeEnabled: boolean
   fadeDuration: number
+  // added after the first release — absent in older project files
+  logoText?: string
+  logoPath?: string | null
+  logoSize?: number
+  logoX?: number
+  logoY?: number
+  fontPath?: string | null
 }
 
 declare global {

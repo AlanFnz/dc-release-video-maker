@@ -29,6 +29,10 @@ export function registerHandlers(): void {
       ext === 'm4a' ? 'audio/mp4' :
       ext === 'flac' ? 'audio/flac' :
       ext === 'ogg' ? 'audio/ogg' :
+      ext === 'ttf' ? 'font/ttf' :
+      ext === 'otf' ? 'font/otf' :
+      ext === 'woff' ? 'font/woff' :
+      ext === 'woff2' ? 'font/woff2' :
       'application/octet-stream'
     return `data:${mime};base64,${buf.toString('base64')}`
   })
